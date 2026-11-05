@@ -502,8 +502,9 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 	const partial = bucket !== undefined && costTokens + 1 < billable;
 	const firstTime = entry?.data?.firstTime;
 	const fromTime = partial && firstTime !== undefined && firstTime !== null ? formatCostFrom(firstTime) : null;
-	const baseCostText = bucket === undefined ? null : displayAmount(bucket, false) ?? tCost("session.unpriced");
-	const costText = baseCostText === null ? null : (fromTime === null ? baseCostText : tCost("session.partialAmount", { amount: baseCostText }));
+	const baseAmount = bucket === undefined ? null : displayAmount(bucket, false);
+	const baseCostText = baseAmount === null ? (bucket === undefined ? null : tCost("session.unpriced")) : baseAmount;
+	const costText = baseCostText === null ? null : (fromTime === null || baseAmount === null ? baseCostText : tCost("session.partialAmount", { amount: baseCostText }));
 	const label = mode === "compact" ? joined(cacheHitText, costText) : joined(joined(totalText, cacheHitText), costText);
 	if (label === null || label === undefined) return null;
 	const aria = (mode === "compact" ? [cacheHitText, costText] : [totalText, cacheHitText, costText]).filter((value) => value !== null && value !== undefined).join(" · ");
