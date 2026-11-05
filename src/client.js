@@ -283,7 +283,11 @@ window.__ModuleLoader__.load({
 		const zh = {
 			"turn.unpriced": "未定价",
 			"session.unpriced": "费用未定价",
+			"session.partialAmount": "{amount} 起",
 			"detail.cost": "费用",
+			"detail.costFrom": "费用（自 {time} 起）",
+			"detail.partial": "费用只统计了 {time} 之后日志中可用的调用；更早的调用未计入。",
+			"detail.unavailable": "费用暂不可用；上方仍是完整的 token 使用量。",
 			"detail.models": "模型路由",
 			"detail.peak": "高峰费用",
 			"detail.offPeak": "空闲费用",
@@ -297,7 +301,11 @@ window.__ModuleLoader__.load({
 		const en = {
 			"turn.unpriced": "Unpriced",
 			"session.unpriced": "Cost unpriced",
+			"session.partialAmount": "{amount}+",
 			"detail.cost": "Cost",
+			"detail.costFrom": "Cost (from {time})",
+			"detail.partial": "Cost counts calls available in the log from {time}; earlier calls are not included.",
+			"detail.unavailable": "Cost is unavailable; the token usage above is still complete.",
 			"detail.models": "Model routes",
 			"detail.peak": "Peak cost",
 			"detail.offPeak": "Off-peak cost",

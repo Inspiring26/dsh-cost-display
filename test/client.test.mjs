@@ -9,6 +9,7 @@ const pkg = JSON.parse(readFileSync(resolve(here, "../package.json"), "utf8"));
 const localRequire = createRequire(resolve(here, "../package.json"));
 const React = localRequire("react");
 const { renderToStaticMarkup } = localRequire("react-dom/server");
+const { act, create } = localRequire("react-test-renderer");
 const { zipSync, strToU8 } = localRequire("fflate");
 
 const at = (iso) => Date.parse(iso);
@@ -207,5 +208,56 @@ assert.ok(dialogHtml.includes("detail.peak"));
 assert.ok(dialogHtml.includes("detail.offPeak"));
 assert.ok(dialogHtml.includes("detail.cost"));
 assert.ok(dialogHtml.includes("dsh-cost-note"));
+
+// 5. Hook-order regression: the projection is undefined on the first render and
+// defined afterwards. The session usage pill must survive both renders instead of
+// changing its hook count and being abdicated by the slot error boundary.
+const pillElement = (value) => React.createElement(module.__test.UsagePill, {
+  useProjection: () => value,
+  usePerformanceUsage: (selector) => selector("detailed"),
+  sessionId: "session-test",
+  t,
+  tCost,
+});
+let tree;
+act(() => {
+  tree = create(pillElement(undefined));
+});
+assert.equal(tree.toJSON(), null);
+act(() => {
+  tree.update(pillElement(tokenUsage));
+});
+assert.ok(JSON.stringify(tree.toJSON()).includes("bOPqQW_pill"), "pill should render after the projection arrives");
+act(() => tree.unmount());
+
+// 6. Partial coverage: the log has 2M tokens but the session projection reports
+// 3M, so the label keeps the token total and marks the cost as "from <time>".
+const extendedUsage = { ...tokenUsage, totalTokens: 3_000_000, uncachedInputTokens: 3_000_000 };
+const partialHtml = renderToStaticMarkup(React.createElement(module.__test.UsagePill, {
+  useProjection: () => extendedUsage,
+  usePerformanceUsage: (selector) => selector("detailed"),
+  sessionId: "session-test",
+  t,
+  tCost,
+}));
+assert.ok(partialHtml.includes("session.partialAmount"), partialHtml);
+assert.ok(partialHtml.includes("¥3.00"), partialHtml);
+
+const partialRows = [];
+module.__test.appendCostRows(partialRows, total, tCost, false, tCost("detail.costFrom", { time: "11-04 10:00" }));
+const partialDialog = renderToStaticMarkup(React.createElement(module.__test.UsageDialog, {
+  popover: { panelRef: { current: null }, pos: null },
+  icon: null,
+  title: "usage",
+  titleValue: "3M",
+  rows: partialRows,
+  detailsAttr: { "data-session-stats-usage": true },
+  bucket: total,
+  approximate: false,
+  partialNote: tCost("detail.partial", { time: "11-04 10:00" }),
+  tCost,
+}));
+assert.ok(partialDialog.includes("detail.costFrom"));
+assert.ok(partialDialog.includes("detail.partial"));
 
 console.log("client tests passed");

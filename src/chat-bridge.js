@@ -148,6 +148,14 @@ function formatMessageClock(time, t, now = Date.now()) {
 	return (d.getFullYear() === n.getFullYear() ? t("clock.md", params) : t("clock.ymd", params)) + " " + clock;
 }
 
+/** Compact local timestamp for a partial-cost coverage start. */
+function formatCostFrom(ms) {
+	const d = new Date(ms);
+	const now = new Date();
+	const date = d.getFullYear() === now.getFullYear() ? pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) : d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+	return date + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+}
+
 function formatTokens(value, t) {
 	const scaled = (candidate) => (candidate >= 100 ? String(Math.round(candidate)) : String(Math.round(candidate * 10) / 10));
 	if (value < 1e3) return String(value);
@@ -243,9 +251,9 @@ function row(key, label, value, valueClassName) {
 	return h(React.Fragment, { key }, h("dt", null, label), h("dd", valueClassName === undefined ? null : { className: valueClassName }, value));
 }
 
-function appendCostRows(rows, bucket, tCost, approximate) {
+function appendCostRows(rows, bucket, tCost, approximate, costLabel) {
 	const amount = displayAmount(bucket, approximate);
-	rows.push(row("cost", tCost("detail.cost"), amount === null ? tCost("turn.unpriced") : amount));
+	rows.push(row("cost", costLabel ?? tCost("detail.cost"), amount === null ? tCost("turn.unpriced") : amount));
 	if (bucket.peakCalls > 0) {
 		rows.push(row("peak", tCost("detail.peak"), formatCny(bucket.peakCost) + " · " + tCost("detail.calls", { count: bucket.peakCalls })));
 	}
@@ -257,7 +265,7 @@ function appendCostRows(rows, bucket, tCost, approximate) {
 	}
 }
 
-function UsageDialog({ popover, icon, title, titleValue, rows, detailsAttr, bucket, approximate, tCost }) {
+function UsageDialog({ popover, icon, title, titleValue, rows, detailsAttr, bucket, approximate, partialNote, unavailableNote, tCost }) {
 	return h("div", {
 		ref: popover.panelRef,
 		className: "bRhRbq_panel",
@@ -271,7 +279,11 @@ function UsageDialog({ popover, icon, title, titleValue, rows, detailsAttr, buck
 		className: "dsh-cost-note"
 	}, tCost("detail.estimate")), bucket !== undefined && h("p", {
 		className: "dsh-cost-note"
-	}, tCost("detail.peakWindows")), approximate && h("p", {
+	}, tCost("detail.peakWindows")), partialNote !== undefined && h("p", {
+		className: "dsh-cost-note"
+	}, partialNote), unavailableNote !== undefined && h("p", {
+		className: "dsh-cost-note"
+	}, unavailableNote), approximate && h("p", {
 		className: "dsh-cost-note"
 	}, tCost("detail.approximate")));
 }
@@ -321,6 +333,7 @@ function TurnUsagePanel({ usage, t, tCost, turn, time, sessionId }) {
 		detailsAttr: { "data-turn-usage-details": true },
 		bucket,
 		approximate: resolved.approximate,
+		unavailableNote: bucket === undefined && entry !== undefined && entry.status !== "loading" ? tCost("detail.unavailable") : undefined,
 		tCost
 	}), document.body));
 }
@@ -475,12 +488,22 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 	const entry = useSessionCost(sessionId, usage === undefined ? undefined : total);
 	const bucket = entry?.data?.total !== undefined && entry.data.total.calls > 0 ? entry.data.total : undefined;
 	const popover = usePopover();
-	if (usage === undefined || total === 0) return null;
+	// Hook order must be unconditional: `usage` is undefined before the first
+	// projection arrives, so this must run before the empty-state return.
 	const mode = usePerformanceUsage === undefined ? "detailed" : usePerformanceUsage((value) => value);
+	if (usage === undefined || total === 0) return null;
 	const cacheHit = cacheHitPercent(usage);
 	const cacheHitText = cacheHit === null ? null : t("stats.cacheHit", { percent: cacheHit });
 	const totalText = t("message.turnUsage.count", { count: formatTokens(total, t) });
-	const costText = bucket === undefined ? null : displayAmount(bucket, false) ?? tCost("session.unpriced");
+	// If the log starts after the session began, the total is partial. Keep the
+	// original token label and append the cost from the first available call.
+	const billable = (usage.uncachedInputTokens ?? 0) + (usage.cacheReadTokens ?? 0) + (usage.outputTokens ?? 0);
+	const costTokens = bucket === undefined ? 0 : (bucket.hitTokens ?? 0) + (bucket.missTokens ?? 0) + (bucket.outTokens ?? 0);
+	const partial = bucket !== undefined && costTokens + 1 < billable;
+	const firstTime = entry?.data?.firstTime;
+	const fromTime = partial && firstTime !== undefined && firstTime !== null ? formatCostFrom(firstTime) : null;
+	const baseCostText = bucket === undefined ? null : displayAmount(bucket, false) ?? tCost("session.unpriced");
+	const costText = baseCostText === null ? null : (fromTime === null ? baseCostText : tCost("session.partialAmount", { amount: baseCostText }));
 	const label = mode === "compact" ? joined(cacheHitText, costText) : joined(joined(totalText, cacheHitText), costText);
 	if (label === null || label === undefined) return null;
 	const aria = (mode === "compact" ? [cacheHitText, costText] : [totalText, cacheHitText, costText]).filter((value) => value !== null && value !== undefined).join(" · ");
@@ -491,7 +514,7 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 	rows.push(row("cacheRead", t("message.turnUsage.cacheRead"), exactCount(usage.cacheReadTokens, t)));
 	if (usage.cacheWriteTokens !== 0) rows.push(row("cacheWrite", t("message.turnUsage.cacheWrite"), exactCount(usage.cacheWriteTokens, t)));
 	rows.push(row("output", t("message.turnUsage.output"), exactCount(usage.outputTokens, t)));
-	if (bucket !== undefined) appendCostRows(rows, bucket, tCost, false);
+	if (bucket !== undefined) appendCostRows(rows, bucket, tCost, false, fromTime === null ? undefined : tCost("detail.costFrom", { time: fromTime }));
 
 	return h("span", { ref: popover.rootRef, className: "bOPqQW_anchor", "data-composer-stat": "usage" }, h("button", {
 		type: "button",
@@ -510,6 +533,8 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 		detailsAttr: { "data-session-stats-usage": true },
 		bucket,
 		approximate: false,
+		partialNote: partial && fromTime !== null ? tCost("detail.partial", { time: fromTime }) : undefined,
+		unavailableNote: bucket === undefined && entry !== undefined && entry.status !== "loading" ? tCost("detail.unavailable") : undefined,
 		tCost
 	}), document.body));
 });

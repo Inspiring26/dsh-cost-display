@@ -130,6 +130,7 @@ pkg.devDependencies = {
   fflate: "^0.8.2",
   react: "^18.3.1",
   "react-dom": "^18.3.1",
+  "react-test-renderer": "^18.3.1",
 };
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 
