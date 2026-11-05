@@ -8,6 +8,8 @@
 
 > 下面用 `Inspiring26` 表示你的 GitHub 用户名，`inspiring26` 表示你的 npm scope（通常和 GitHub 用户名相同）。发布前先决定这两个名字。
 
+> **仓库已经建好之后**：日常开发直接在 git checkout 里改 `src/`、跑 `pnpm test && pnpm build`，然后 commit/push 即可。`prepare-release` 只在首次生成、改包名或改仓库地址时使用。
+
 ## 0. 准备
 
 - Node.js 22+、pnpm（或 npm）；
