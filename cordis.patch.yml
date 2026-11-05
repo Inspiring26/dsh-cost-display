@@ -1,0 +1,3 @@
+- insert:
+    - id: cost-display
+      name: '@inspiring26/dsh-cost-display'

@@ -1,0 +1,75 @@
+{
+  "name": "@inspiring26/dsh-cost-display",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Appends DeepSeek peak/off-peak cost estimates to the native per-turn and session usage displays.",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "deepseek",
+    "cost",
+    "usage",
+    "pricing",
+    "peak-pricing"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "src/**",
+    "build.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "dsh": ">=0.2.1-rc.4 <0.3.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node --check client.js",
+    "test": "node test/cost-core.test.mjs && node test/load-bundle.mjs && node test/client.test.mjs",
+    "prepack": "node build.mjs"
+  },
+  "devDependencies": {
+    "fflate": "^0.8.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-chat"
+      ]
+    }
+  },
+  "author": {
+    "name": "Inspiring26"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Inspiring26/dsh-cost-display.git"
+  },
+  "homepage": "https://github.com/Inspiring26/dsh-cost-display",
+  "bugs": {
+    "url": "https://github.com/Inspiring26/dsh-cost-display/issues"
+  }
+}

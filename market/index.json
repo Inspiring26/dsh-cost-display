@@ -1,0 +1,63 @@
+{
+  "format": 1,
+  "title": {
+    "en": "dsh-cost-display",
+    "zh": "DSH 峰谷费用"
+  },
+  "description": {
+    "en": "Peak/off-peak DeepSeek cost estimates appended to the native DSH usage displays.",
+    "zh": "在 DSH 原生每轮用量和整体用量文字后追加 DeepSeek 峰谷费用。"
+  },
+  "metadata": {
+    "categories": {
+      "usage": {
+        "title": {
+          "en": "Usage and cost",
+          "zh": "用量与费用"
+        }
+      }
+    },
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "@inspiring26/dsh-cost-display",
+      "title": {
+        "en": "DeepSeek Peak/Off-Peak Cost",
+        "zh": "DeepSeek 峰谷费用"
+      },
+      "description": {
+        "en": "Appends DeepSeek peak/off-peak cost estimates to the native per-turn and session usage displays.",
+        "zh": "在原生每轮用量和整体用量文字后追加 DeepSeek 峰谷费用，点开可看高峰/空闲拆分。"
+      },
+      "icon": "https://raw.githubusercontent.com/Inspiring26/dsh-cost-display/main/assets/icon-180.png",
+      "author": "Inspiring26",
+      "homepage": "https://github.com/Inspiring26/dsh-cost-display",
+      "repository": {
+        "url": "https://github.com/Inspiring26/dsh-cost-display"
+      },
+      "metadata": {
+        "category": "usage",
+        "keywords": [
+          "cost",
+          "usage",
+          "pricing",
+          "peak-pricing"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1793842401,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.4 <0.3.0"
+          }
+        }
+      ]
+    }
+  ]
+}

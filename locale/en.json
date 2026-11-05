@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "DeepSeek Peak/Off-Peak Cost",
+    "description": "Appends a “·¥x” cost to the native per-turn and session usage labels; the usage dialog keeps the original token rows and adds peak/off-peak cost rows."
+  }
+}
