@@ -499,7 +499,7 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 	// original token label and append the cost from the first available call.
 	const billable = (usage.uncachedInputTokens ?? 0) + (usage.cacheReadTokens ?? 0) + (usage.outputTokens ?? 0);
 	const costTokens = bucket === undefined ? 0 : (bucket.hitTokens ?? 0) + (bucket.missTokens ?? 0) + (bucket.outTokens ?? 0);
-	const partial = bucket !== undefined && costTokens + 1 < billable;
+	const partial = bucket !== undefined && costTokens + 1 < billable && costTokens < billable * 0.99;
 	const firstTime = entry?.data?.firstTime;
 	const fromTime = partial && firstTime !== undefined && firstTime !== null ? formatCostFrom(firstTime) : null;
 	const baseAmount = bucket === undefined ? null : displayAmount(bucket, false);
