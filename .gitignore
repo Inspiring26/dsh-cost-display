@@ -1,5 +1,6 @@
 node_modules/
 .pnpm-store/
+.npm-cache/
 release/
 .preview/
 .DS_Store
