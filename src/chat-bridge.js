@@ -507,7 +507,7 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 	const costText = baseCostText === null ? null : (fromTime === null || baseAmount === null ? baseCostText : tCost("session.partialAmount", { amount: baseCostText }));
 	const label = mode === "compact" ? joined(cacheHitText, costText) : joined(joined(totalText, cacheHitText), costText);
 	if (label === null || label === undefined) return null;
-	const aria = (mode === "compact" ? [cacheHitText, costText] : [totalText, cacheHitText, costText]).filter((value) => value !== null && value !== undefined).join(" · ");
+	const aria = (mode === "compact" ? [cacheHitText, costText] : [totalText, cacheHitText, costText]).filter((value) => value !== null && value !== undefined).join(" · ") + (fromTime === null ? "" : " · " + tCost("session.fromAria", { time: fromTime }));
 
 	const rows = [];
 	if (cacheHit !== null) rows.push(row("cacheHit", t("message.turnUsage.cacheHit"), cacheHit + "%"));

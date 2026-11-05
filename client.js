@@ -1382,7 +1382,7 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 	const costText = baseCostText === null ? null : (fromTime === null || baseAmount === null ? baseCostText : tCost("session.partialAmount", { amount: baseCostText }));
 	const label = mode === "compact" ? joined(cacheHitText, costText) : joined(joined(totalText, cacheHitText), costText);
 	if (label === null || label === undefined) return null;
-	const aria = (mode === "compact" ? [cacheHitText, costText] : [totalText, cacheHitText, costText]).filter((value) => value !== null && value !== undefined).join(" · ");
+	const aria = (mode === "compact" ? [cacheHitText, costText] : [totalText, cacheHitText, costText]).filter((value) => value !== null && value !== undefined).join(" · ") + (fromTime === null ? "" : " · " + tCost("session.fromAria", { time: fromTime }));
 
 	const rows = [];
 	if (cacheHit !== null) rows.push(row("cacheHit", t("message.turnUsage.cacheHit"), cacheHit + "%"));
@@ -1425,6 +1425,7 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 			"turn.unpriced": "未定价",
 			"session.unpriced": "费用未定价",
 			"session.partialAmount": "{amount} 起",
+			"session.fromAria": "费用自 {time} 起",
 			"detail.cost": "费用",
 			"detail.costFrom": "费用（自 {time} 起）",
 			"detail.partial": "费用只统计了 {time} 之后日志中可用的调用；更早的调用未计入。",
@@ -1443,6 +1444,7 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 			"turn.unpriced": "Unpriced",
 			"session.unpriced": "Cost unpriced",
 			"session.partialAmount": "{amount}+",
+			"session.fromAria": "Cost from {time}",
 			"detail.cost": "Cost",
 			"detail.costFrom": "Cost (from {time})",
 			"detail.partial": "Cost counts calls available in the log from {time}; earlier calls are not included.",
