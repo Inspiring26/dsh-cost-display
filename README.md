@@ -4,7 +4,7 @@
   <img src="https://raw.githubusercontent.com/Inspiring26/dsh-cost-display/main/icon.svg" width="76" height="76" alt="DeepSeek 峰谷费用图标">
 </p>
 
-[![npm](https://img.shields.io/npm/v/@inspiring26/dsh-cost-display?style=flat-square)](https://www.npmjs.com/package/@inspiring26/dsh-cost-display)
+[![npm](https://img.shields.io/npm/v/@weeh/dsh-cost-display?style=flat-square)](https://www.npmjs.com/package/@weeh/dsh-cost-display)
 [![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 [![CI](https://github.com/Inspiring26/dsh-cost-display/actions/workflows/ci.yml/badge.svg)](https://github.com/Inspiring26/dsh-cost-display/actions/workflows/ci.yml)
 
@@ -26,7 +26,7 @@
 从 npm 安装：
 
 ```sh
-dsh plugin --profile web add @inspiring26/dsh-cost-display@0.1.0
+dsh plugin --profile web add @weeh/dsh-cost-display@0.1.0
 ```
 
 从本地目录安装（开发时）：
@@ -46,7 +46,7 @@ https://realoiyo.github.io/dsh-plugin-market/index.json
 卸载：
 
 ```sh
-dsh plugin --profile web remove @inspiring26/dsh-cost-display
+dsh plugin --profile web remove @weeh/dsh-cost-display
 ```
 
 ## 价目（元 / 1M tokens）

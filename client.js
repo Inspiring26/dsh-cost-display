@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-	id: "@inspiring26/dsh-cost-display",
+	id: "@weeh/dsh-cost-display",
 	factory: (require) => {
 		var module = { exports: {} };
 		var exports = module.exports;
@@ -1514,8 +1514,8 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 			ctx.effect(() => {
 				if (typeof document === "undefined") return undefined;
 				const tag = document.createElement("style");
-				tag.dataset.plugin = "@inspiring26/dsh-cost-display";
-				tag.dataset.pluginCss = "@inspiring26/dsh-cost-display/styles";
+				tag.dataset.plugin = "@weeh/dsh-cost-display";
+				tag.dataset.pluginCss = "@weeh/dsh-cost-display/styles";
 				tag.textContent = CSS;
 				document.head.appendChild(tag);
 				return () => {

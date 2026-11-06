@@ -1,5 +1,5 @@
 {
-  "name": "@inspiring26/dsh-cost-display",
+  "name": "@weeh/dsh-cost-display",
   "version": "0.1.0",
   "type": "module",
   "description": "Appends DeepSeek peak/off-peak cost estimates to the native per-turn and session usage displays.",
@@ -63,7 +63,7 @@
     }
   },
   "author": {
-    "name": "Inspiring26"
+    "name": "weeh"
   },
   "repository": {
     "type": "git",

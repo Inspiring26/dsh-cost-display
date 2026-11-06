@@ -6,7 +6,7 @@
 2. 一个可安装的 npm 包；
 3. 一个能被 DSH「发现」页和社区市场收录的插件。
 
-> 下面用 `Inspiring26` 表示你的 GitHub 用户名，`inspiring26` 表示你的 npm scope（通常和 GitHub 用户名相同）。发布前先决定这两个名字。
+> 下面用 `Inspiring26` 表示你的 GitHub 用户名，`weeh` 表示你的 npm scope（通常和 GitHub 用户名相同）。发布前先决定这两个名字。
 
 > **仓库已经建好之后**：日常开发直接在 git checkout 里改 `src/`、跑 `pnpm test && pnpm build`，然后 commit/push 即可。`prepare-release` 只在首次生成、改包名或改仓库地址时使用。
 
@@ -25,14 +25,14 @@
 cd "/Users/huangyong/Downloads/dsh/dsh改造/dsh-cost-plugin"
 
 node scripts/prepare-release.mjs \
-  --name @inspiring26/dsh-cost-display \
+  --name @weeh/dsh-cost-display \
   --repo https://github.com/Inspiring26/dsh-cost-display \
   --author "你的名字"
 ```
 
 它会生成 `release/`，并完成这些事：
 
-- `package.json`：改名为 `@inspiring26/dsh-cost-display`，去掉 `private`，补 `repository`、`homepage`、`bugs`、`author`、`license`、`keywords`、`publishConfig`、`engines.dsh`；
+- `package.json`：改名为 `@weeh/dsh-cost-display`，去掉 `private`，补 `repository`、`homepage`、`bugs`、`author`、`license`、`keywords`、`publishConfig`、`engines.dsh`；
 - `client.js` 与 `src/client.js`：把模块 id 里的本地前缀改成新包名；
 - `cordis.patch.yml`：把 Host 行名改成新包名；
 - `LICENSE`：写入你的名字；
@@ -81,7 +81,7 @@ gh repo create Inspiring26/dsh-cost-display --public --source=. --remote=origin 
 
 ## 3. 发布到 npm
 
-> 发布前确认你已经在 npm 登录，并且 `@inspiring26` 是你的 scope。
+> 发布前确认你已经在 npm 登录，并且 `@weeh` 是你的 scope。
 
 ```bash
 cd release
@@ -105,8 +105,8 @@ sudo chown -R "$(id -u):$(id -g)" ~/.npm
 发布成功后验证：
 
 ```bash
-npm view @inspiring26/dsh-cost-display version
-npm view @inspiring26/dsh-cost-display keywords
+npm view @weeh/dsh-cost-display version
+npm view @weeh/dsh-cost-display keywords
 ```
 
 `keywords` 里必须能看到 `dsh-plugin`，`package.json` 里必须有：
@@ -212,7 +212,7 @@ raw 地址是最终地址，不会重定向；但 GitHub Pages 更像一个“�
 
 ```bash
 node scripts/prepare-release.mjs \
-  --name @inspiring26/dsh-cost-display \
+  --name @weeh/dsh-cost-display \
   --repo https://github.com/Inspiring26/dsh-cost-display \
   --author "你的名字" --version 0.1.1 --force
 ```
@@ -225,7 +225,7 @@ node scripts/prepare-release.mjs \
 ## 6. 注意事项
 
 - **兼容范围**：`package.json` 的 `engines.dsh` 目前是 `>=0.2.1-rc.4 <0.3.0`。插件覆盖了 DSH 0.2.1-rc.4 的 `turn-tail` / `usage` 槽位组件，DSH 升级到 0.3 及以上时请先验证再放宽范围。
-- **npm scope**：`@inspiring26` 必须是你的 npm scope；第一次发布前在 npm 上创建 scope（通常与用户名相同）。
+- **npm scope**：`@weeh` 必须是你的 npm scope；第一次发布前在 npm 上创建 scope（通常与用户名相同）。
 - **不要发布 `@local/...`**：本地开发包带 `private: true`，直接 `npm publish` 会失败；用 `release/`。
 - **不要提交 `node_modules`**：`.gitignore` 已处理；`release/` 里重新 `pnpm install`。
 - **测试依赖**：`pnpm install` 会装 `react`、`react-dom`、`fflate` 作为 devDependencies；正式运行不需要它们。

@@ -22,7 +22,7 @@
   },
   "plugins": [
     {
-      "name": "@inspiring26/dsh-cost-display",
+      "name": "@weeh/dsh-cost-display",
       "title": {
         "en": "DeepSeek Peak/Off-Peak Cost",
         "zh": "DeepSeek 峰谷费用"
@@ -32,7 +32,7 @@
         "zh": "在原生每轮用量和整体用量文字后追加 DeepSeek 峰谷费用，点开可看高峰/空闲拆分。"
       },
       "icon": "https://raw.githubusercontent.com/Inspiring26/dsh-cost-display/main/assets/icon-180.png",
-      "author": "Inspiring26",
+      "author": "weeh",
       "homepage": "https://github.com/Inspiring26/dsh-cost-display",
       "repository": {
         "url": "https://github.com/Inspiring26/dsh-cost-display"
@@ -49,7 +49,7 @@
       "versions": [
         {
           "version": "0.1.0",
-          "publishTimestamp": 1793842986,
+          "publishTimestamp": 1793943827,
           "source": {
             "type": "npm"
           },
