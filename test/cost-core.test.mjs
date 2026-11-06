@@ -142,6 +142,25 @@ assert.equal(result.models.find((entry) => entry.model === "deepseek-v4-pro").ca
 assert.equal(result.models.find((entry) => entry.model === "some-other-model").unpricedCalls, 1);
 assert.equal(result.firstTime, at("2026-11-04T02:00:00Z"));
 assert.equal(result.lastTime, at("2026-11-04T05:40:00Z"));
+// 按北京日历日聚合：这批调用都在 11-04 10:00–13:40（北京时间）。
+assert.deepEqual(Object.keys(result.byDay), ["2026-11-04"]);
+assert.equal(result.byDay["2026-11-04"].calls, 8);
+assert.equal(result.byDay["2026-11-04"].cost, result.total.cost);
+assert.equal(result.byDay["2026-11-04"].peakCost, result.total.peakCost);
+assert.equal(result.byDay["2026-11-04"].offPeakCost, result.total.offPeakCost);
+
+// 跨北京午夜：23:59 与次日 00:00 必须落在不同的日桶。
+const midnightLog = [
+  JSON.stringify({ type: "session", version: 4, id: "session-midnight" }),
+  JSON.stringify(event(0, "2026-11-04T15:59:00Z", "request/context", { provider: "deepseek-official", model: "deepseek-flash" })),
+  JSON.stringify(event(1, "2026-11-04T15:59:30Z", "step/start", { turn: 1, step: 1 })),
+  JSON.stringify(event(2, "2026-11-04T15:59:31Z", "assistant/message", { turn: 1, step: 1, usage: { inputTokens: 1_000_000 } })),
+  JSON.stringify(event(3, "2026-11-04T16:00:00Z", "step/start", { turn: 2, step: 1 })),
+  JSON.stringify(event(4, "2026-11-04T16:00:01Z", "assistant/message", { turn: 2, step: 1, usage: { inputTokens: 1_000_000 } })),
+].join("\n");
+const midnight = computeSessionCost(midnightLog);
+assert.equal(midnight.byDay["2026-11-04"].calls, 1, "23:59 北京仍在 11-04");
+assert.equal(midnight.byDay["2026-11-05"].calls, 1, "00:00 北京进入 11-05");
 
 // 空日志与坏行不应抛错
 assert.equal(computeSessionCost("").calls, 0);

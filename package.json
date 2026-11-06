@@ -1,8 +1,8 @@
 {
   "name": "@weeh/dsh-cost-display",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
-  "description": "Appends DeepSeek peak/off-peak cost estimates to the native per-turn and session usage displays.",
+  "description": "Appends DeepSeek peak/off-peak cost estimates to native usage displays and shows global today/month totals in the session dialog.",
   "license": "MIT",
   "keywords": [
     "dsh",
@@ -40,7 +40,7 @@
   "scripts": {
     "build": "node build.mjs",
     "check": "node --check client.js",
-    "test": "node test/cost-core.test.mjs && node test/load-bundle.mjs && node test/client.test.mjs",
+    "test": "node test/cost-core.test.mjs && node test/load-bundle.mjs && node test/client.test.mjs && node test/host.test.mjs",
     "prepack": "node build.mjs"
   },
   "devDependencies": {
@@ -63,7 +63,7 @@
     }
   },
   "author": {
-    "name": "weeh"
+    "name": "Inspiring26"
   },
   "repository": {
     "type": "git",

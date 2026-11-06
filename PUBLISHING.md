@@ -61,7 +61,7 @@ pnpm build
 cd release
 git init
 git add -A
-git commit -m "feat: dsh-cost-display 0.1.0"
+git commit -m "feat: dsh-cost-display 0.1.1"
 git branch -M main
 git remote add origin https://github.com/Inspiring26/dsh-cost-display.git
 git push -u origin main
@@ -77,7 +77,7 @@ gh repo create Inspiring26/dsh-cost-display --public --source=. --remote=origin 
 
 - **About** 里填一句描述，加上 topics：`dsh`、`dsh-plugin`、`deepseek-harness`、`cost`、`usage`；
 - **Settings → Pages** 可以稍后开启（用于自建市场索引，见第 5 节）；
-- 创建一个 **Release**，tag 用 `v0.1.0`，附上 `dsh-cost-display-0.1.0.tgz`（可选，但推荐）。
+- 创建一个 **Release**，tag 用 `v0.1.1`，附上 `dsh-cost-display-0.1.1.tgz`（可选，但推荐）。
 
 ## 3. 发布到 npm
 

@@ -191,39 +191,31 @@ function addPriced(bucket, priced) {
 }
 
 /**
- * 把一份完整的会话 JSONL 折叠成费用总计与逐 Turn 费用。
+ * 把一批已解析的会话事件折叠成费用总计、按北京日与逐 Turn 的费用。
  *
  * 只统计 provider 真正上报了 usage 的 assistant/message 与
  * compaction/summary；不会从文本猜 token。fork 继承前缀（
  * `session/end-seed { inherited: true }` 之前）会被跳过，避免重复计费。
  *
- * @param jsonl - 会话导出文本（第一行 header，其余每行一个事件）。
+ * @param events - 会话事件数组（宿主端全局汇总直接传入，无需再序列化）。
  * @param options - { holidays?: string[] }
- * @returns { total, byTurn, calls, unpricedCalls, models, firstTime, lastTime }
+ * @returns { total, byDay, byTurn, calls, unpricedCalls, models, firstTime, lastTime }
  */
-export function computeSessionCost(jsonl, options = {}) {
+export function foldSessionCost(events, options = {}) {
+  const list = Array.isArray(events) ? events : [];
   const holidays = options.holidays ?? DEFAULT_HOLIDAYS;
-  const lines = typeof jsonl === "string" ? jsonl.split(/\r?\n/) : [];
-  const events = [];
-  for (const line of lines) {
-    const text = line.trim();
-    if (text === "") continue;
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed && typeof parsed === "object") events.push(parsed);
-    } catch {
-      // 导出的日志应当逐行合法；坏行宁可跳过，也不要让整个费用面板失效。
-    }
-  }
 
   // 跳过 fork 继承前缀：取最后一个 inherited 标记之后的事件。
-  let start = 0;
-  for (let index = 0; index < events.length; index += 1) {
-    const event = events[index];
-    if (event.type === "session/end-seed" && event.data?.inherited === true) start = index + 1;
+  // 宿主端还会传入日志头记录的前缀长度，标记缺失时用它兜底。
+  const inherited = Number.isInteger(options.inheritedEventCount) && options.inheritedEventCount > 0 ? options.inheritedEventCount : 0;
+  let start = Math.min(inherited, list.length);
+  for (let index = 0; index < list.length; index += 1) {
+    const event = list[index];
+    if (event.type === "session/end-seed" && event.data?.inherited === true) start = Math.max(start, index + 1);
   }
 
   const total = emptyBucket();
+  const byDay = Object.create(null);
   const byTurn = Object.create(null);
   const models = Object.create(null);
   const stepStarts = new Map();
@@ -238,7 +230,7 @@ export function computeSessionCost(jsonl, options = {}) {
   // fork 子会话可能不在自己的日志里重复 route：继承前缀里的最后一个
   // request/context 或 request/header 仍是子会话实际使用的路由。
   for (let index = 0; index < start; index += 1) {
-    const event = events[index];
+    const event = list[index];
     const data = event.data ?? {};
     if (event.type === "request/header") {
       const config = data.header?.config;
@@ -263,6 +255,12 @@ export function computeSessionCost(jsonl, options = {}) {
     const priced = priceUsage(usage, routeModel, at, holidays);
     addPriced(total, priced);
     addPriced(bucketFor(turn), priced);
+    // 按北京日历日聚合，供「今天费用 / 本月费用」直接读取。
+    if (Number.isFinite(at)) {
+      const date = beijingParts(at).date;
+      if (byDay[date] === undefined) byDay[date] = emptyBucket();
+      addPriced(byDay[date], priced);
+    }
     const modelKey = priced.priced ? priced.model : (priced.model || "(unknown)");
     if (models[modelKey] === undefined) {
       const label = priced.priced ? priced.label : priced.model || "(unknown)";
@@ -276,8 +274,8 @@ export function computeSessionCost(jsonl, options = {}) {
     if (lastTime === null || at > lastTime) lastTime = at;
   };
 
-  for (let index = start; index < events.length; index += 1) {
-    const event = events[index];
+  for (let index = start; index < list.length; index += 1) {
+    const event = list[index];
     const data = event.data ?? {};
     switch (event.type) {
       case "request/header": {
@@ -340,6 +338,7 @@ export function computeSessionCost(jsonl, options = {}) {
 
   return {
     total,
+    byDay,
     byTurn,
     calls: total.calls,
     unpricedCalls: total.unpricedCalls,
@@ -347,6 +346,28 @@ export function computeSessionCost(jsonl, options = {}) {
     firstTime,
     lastTime,
   };
+}
+
+/**
+ * 把一份完整的会话 JSONL 折叠成费用总计、按北京日与逐 Turn 的费用。
+ * @param jsonl - 会话导出文本（第一行 header，其余每行一个事件）。
+ * @param options - { holidays?: string[] }
+ * @returns { total, byDay, byTurn, calls, unpricedCalls, models, firstTime, lastTime }
+ */
+export function computeSessionCost(jsonl, options = {}) {
+  const lines = typeof jsonl === "string" ? jsonl.split(/\r?\n/) : [];
+  const events = [];
+  for (const line of lines) {
+    const text = line.trim();
+    if (text === "") continue;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === "object") events.push(parsed);
+    } catch {
+      // 导出的日志应当逐行合法；坏行宁可跳过，也不要让整个费用面板失效。
+    }
+  }
+  return foldSessionCost(events, options);
 }
 
 /** 从 usage 与单一 route 估算一个 Turn 的费用；用于日志尚未就绪时的兜底。 */

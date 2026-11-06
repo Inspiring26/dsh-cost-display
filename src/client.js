@@ -131,6 +131,60 @@ window.__ModuleLoader__.load({
 			return state;
 		}
 
+		/* ------------------------------------------------------------------ *
+		 * Global today/month summary: one host-side fold over every session.
+		 * Only the aggregate route is cached here; the current-session log is
+		 * still folded locally for the per-turn and session detail rows.
+		 * ------------------------------------------------------------------ */
+
+		const GLOBAL_MAX_AGE_MS = 15000;
+		const GLOBAL_FETCH_TIMEOUT_MS = 25000;
+		const GLOBAL = { at: 0, value: undefined, pending: undefined };
+
+		function requestGlobalCost() {
+			const now = Date.now();
+			if (GLOBAL.value !== undefined && now - GLOBAL.at < GLOBAL_MAX_AGE_MS) return Promise.resolve(GLOBAL.value);
+			if (GLOBAL.pending !== undefined) return GLOBAL.pending;
+			GLOBAL.pending = (async () => {
+				const controller = new AbortController();
+				const timer = setTimeout(() => controller.abort(), GLOBAL_FETCH_TIMEOUT_MS);
+				try {
+					const url = new URL("api/cost.summary", document.baseURI);
+					const response = await fetch(url, {
+						credentials: "same-origin",
+						cache: "no-store",
+						signal: controller.signal
+					});
+					if (!response.ok) throw new Error("HTTP " + response.status);
+					const data = await response.json();
+					if (data === null || typeof data !== "object" || data.today === undefined || data.month === undefined) throw new Error("malformed cost summary");
+					GLOBAL.value = data;
+					GLOBAL.at = Date.now();
+					return data;
+				} finally {
+					clearTimeout(timer);
+					GLOBAL.pending = undefined;
+				}
+			})();
+			return GLOBAL.pending;
+		}
+
+		function useGlobalCost() {
+			const [state, setState] = React.useState({ status: "loading" });
+			React.useEffect(() => {
+				let alive = true;
+				requestGlobalCost().then((data) => {
+					if (alive) setState({ status: "ready", data });
+				}, (error) => {
+					if (alive) setState({ status: "error", error });
+				});
+				return () => {
+					alive = false;
+				};
+			}, []);
+			return state;
+		}
+
 		function usageRefreshKey(usage) {
 			if (usage === undefined || usage === null) return undefined;
 			return (usage.inputTokens ?? usage.uncachedInputTokens ?? 0) + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0) + (usage.outputTokens ?? 0);
@@ -292,6 +346,10 @@ window.__ModuleLoader__.load({
 			"detail.models": "模型路由",
 			"detail.peak": "高峰费用",
 			"detail.offPeak": "空闲费用",
+			"detail.todayMonthGlobal": "今天费用 / 本月费用（全局）",
+			"detail.globalLoading": "计算中…",
+			"detail.globalUnavailable": "暂不可用",
+			"detail.globalRestart": "需重启 DSH",
 			"detail.unpriced": "未定价调用",
 			"detail.calls": "{count} 次",
 			"detail.estimate": "按 DeepSeek 官方人民币峰谷价估算，不是账单。",
@@ -311,6 +369,10 @@ window.__ModuleLoader__.load({
 			"detail.models": "Model routes",
 			"detail.peak": "Peak cost",
 			"detail.offPeak": "Off-peak cost",
+			"detail.todayMonthGlobal": "Today / this month (all sessions)",
+			"detail.globalLoading": "Calculating…",
+			"detail.globalUnavailable": "Unavailable",
+			"detail.globalRestart": "Restart DSH",
 			"detail.unpriced": "Unpriced calls",
 			"detail.calls": "{count} calls",
 			"detail.estimate": "Estimated from DeepSeek's official CNY peak/off-peak rates; not a bill.",
@@ -320,7 +382,9 @@ window.__ModuleLoader__.load({
 
 		const CSS = [
 			".dsh-cost-note{border-top:.5px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-tertiary);margin:12px 0 0;padding-top:10px}",
-			".dsh-cost-note+.dsh-cost-note{border-top:0;margin-top:4px;padding-top:0}"
+			".dsh-cost-note+.dsh-cost-note{border-top:0;margin-top:4px;padding-top:0}",
+			".dsh-cost-global{border-top:.5px solid var(--dsw-alias-border-l2);margin-top:12px;padding-top:10px}",
+			".dsh-cost-global+.dsh-cost-note{border-top:0;margin-top:4px;padding-top:0}"
 		].join("");
 
 		/**
@@ -398,6 +462,7 @@ window.__ModuleLoader__.load({
 				snapshot,
 				resolveTurnBucket,
 				appendCostRows,
+				GlobalCostSection,
 				TurnTailNodeView,
 				UsagePill,
 				TurnUsagePanel,

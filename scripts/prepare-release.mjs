@@ -92,6 +92,7 @@ for (const file of ["client.js", "src/client.js", "cordis.patch.yml", "README.md
   rewrite(file, replacements);
 }
 rewrite("LICENSE", [["Copyright (c) 2026 dsh-cost-display contributors", `Copyright (c) 2026 ${author}`]]);
+rewrite("PUBLISHING.md", [["@0.1.0", `@${version}`], ["0.1.0", version]]);
 
 // Publishable manifest.
 const pkgPath = resolve(out, "package.json");
@@ -100,7 +101,7 @@ pkg.name = name;
 pkg.version = version;
 pkg.private = undefined;
 delete pkg.private;
-pkg.description = "Appends DeepSeek peak/off-peak cost estimates to the native per-turn and session usage displays.";
+pkg.description = "Appends DeepSeek peak/off-peak cost estimates to native usage displays and shows global today/month totals in the session dialog.";
 pkg.license = "MIT";
 pkg.author = { name: author };
 pkg.repository = { type: "git", url: `git+${repo}.git` };
@@ -123,7 +124,7 @@ pkg.files = [
 pkg.scripts = {
   build: "node build.mjs",
   check: "node --check client.js",
-  test: "node test/cost-core.test.mjs && node test/load-bundle.mjs && node test/client.test.mjs",
+  test: "node test/cost-core.test.mjs && node test/load-bundle.mjs && node test/client.test.mjs && node test/host.test.mjs",
   prepack: "node build.mjs",
 };
 pkg.devDependencies = {
@@ -156,8 +157,8 @@ const index = {
       name,
       title: { en: "DeepSeek Peak/Off-Peak Cost", zh: "DeepSeek 峰谷费用" },
       description: {
-        en: "Appends DeepSeek peak/off-peak cost estimates to the native per-turn and session usage displays.",
-        zh: "在原生每轮用量和整体用量文字后追加 DeepSeek 峰谷费用，点开可看高峰/空闲拆分。",
+        en: "Appends DeepSeek peak/off-peak cost estimates to native usage displays and shows global today/month totals in the session dialog.",
+        zh: "在原生用量显示后追加 DeepSeek 峰谷费用；整体用量弹窗还显示全局今天/本月费用。",
       },
       icon: `${rawBase}/assets/icon-180.png`,
       author,
@@ -185,8 +186,8 @@ const awesome = `url: ${repo}
 name: ${owner}/${repository}
 category: usage
 description:
-  en: Appends DeepSeek peak/off-peak cost estimates to the native per-turn and session usage displays.
-  zh: 在原生每轮用量和整体用量文字后追加 DeepSeek 峰谷费用，点开可看高峰/空闲拆分。
+  en: Appends DeepSeek peak/off-peak cost estimates to native usage displays and shows global today/month totals in the session dialog.
+  zh: 在原生用量显示后追加 DeepSeek 峰谷费用；整体用量弹窗还显示全局今天/本月费用。
 icon: ${rawBase}/assets/icon-180.png
 `;
 writeFileSync(resolve(out, "market/awesome-dsh-plugin.yml"), awesome);
@@ -197,7 +198,7 @@ console.log(`repo:    ${repo}`);
 console.log("");
 console.log("next:");
 console.log(`  cd ${out}`);
-console.log("  git init && git add -A && git commit -m \"feat: dsh-cost-display 0.1.0\"");
+console.log(`  git init && git add -A && git commit -m "feat: dsh-cost-display ${version}"`);
 console.log(`  git remote add origin ${repo}.git && git branch -M main && git push -u origin main`);
 console.log("  pnpm install && pnpm test");
 console.log("  npm publish --access public");

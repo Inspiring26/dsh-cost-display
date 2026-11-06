@@ -251,9 +251,11 @@ function row(key, label, value, valueClassName) {
 	return h(React.Fragment, { key }, h("dt", null, label), h("dd", valueClassName === undefined ? null : { className: valueClassName }, value));
 }
 
-function appendCostRows(rows, bucket, tCost, approximate, costLabel) {
-	const amount = displayAmount(bucket, approximate);
-	rows.push(row("cost", costLabel ?? tCost("detail.cost"), amount === null ? tCost("turn.unpriced") : amount));
+function appendCostRows(rows, bucket, tCost, approximate, costLabel, showTotal = true) {
+	if (showTotal) {
+		const amount = displayAmount(bucket, approximate);
+		rows.push(row("cost", costLabel ?? tCost("detail.cost"), amount === null ? tCost("turn.unpriced") : amount));
+	}
 	if (bucket.peakCalls > 0) {
 		rows.push(row("peak", tCost("detail.peak"), formatCny(bucket.peakCost) + " · " + tCost("detail.calls", { count: bucket.peakCalls })));
 	}
@@ -265,7 +267,25 @@ function appendCostRows(rows, bucket, tCost, approximate, costLabel) {
 	}
 }
 
-function UsageDialog({ popover, icon, title, titleValue, rows, detailsAttr, bucket, approximate, partialNote, unavailableNote, tCost }) {
+/**
+ * Global today/month figures from the host route. This block sits below the
+ * usage rows, between the rule and the estimate note.
+ */
+function GlobalCostSection({ tCost }) {
+	const state = useGlobalCost();
+	const amount = (value) => (state.data.partial ? "≥" : "") + formatCny(value);
+	let text;
+	if (state.status === "ready") {
+		text = amount(state.data.today.cost) + " / " + amount(state.data.month.cost);
+	} else if (state.status === "error") {
+		text = state.error?.message === "HTTP 404" ? tCost("detail.globalRestart") : tCost("detail.globalUnavailable");
+	} else {
+		text = tCost("detail.globalLoading");
+	}
+	return h("div", { className: "dsh-cost-global", "data-cost-global": true }, h("dl", { className: "bRhRbq_details" }, row("todayMonthGlobal", tCost("detail.todayMonthGlobal"), text)));
+}
+
+function UsageDialog({ popover, icon, title, titleValue, rows, detailsAttr, bucket, approximate, partialNote, unavailableNote, globalCost = false, tCost }) {
 	return h("div", {
 		ref: popover.panelRef,
 		className: "bRhRbq_panel",
@@ -275,7 +295,7 @@ function UsageDialog({ popover, icon, title, titleValue, rows, detailsAttr, buck
 	}, h("div", { className: "bRhRbq_title" }, h("span", { className: "bRhRbq_titleLabel" }, icon, title), titleValue !== undefined && h("span", { className: "bRhRbq_titleValue" }, titleValue)), h("div", {
 		className: "bRhRbq_titleRule",
 		"aria-hidden": true
-	}), h("dl", Object.assign({ className: "bRhRbq_details" }, detailsAttr), rows), bucket !== undefined && h("p", {
+	}), h("dl", Object.assign({ className: "bRhRbq_details" }, detailsAttr), rows), globalCost && h(GlobalCostSection, { tCost }), bucket !== undefined && h("p", {
 		className: "dsh-cost-note"
 	}, tCost("detail.estimate")), bucket !== undefined && h("p", {
 		className: "dsh-cost-note"
@@ -515,7 +535,11 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 	rows.push(row("cacheRead", t("message.turnUsage.cacheRead"), exactCount(usage.cacheReadTokens, t)));
 	if (usage.cacheWriteTokens !== 0) rows.push(row("cacheWrite", t("message.turnUsage.cacheWrite"), exactCount(usage.cacheWriteTokens, t)));
 	rows.push(row("output", t("message.turnUsage.output"), exactCount(usage.outputTokens, t)));
-	if (bucket !== undefined) appendCostRows(rows, bucket, tCost, false, fromTime === null ? undefined : tCost("detail.costFrom", { time: fromTime }));
+	if (bucket !== undefined) {
+		// The session card omits the total cost row: the pill label already shows
+		// it, and the detail keeps peak/off-peak plus the global row.
+		appendCostRows(rows, bucket, tCost, false, undefined, false);
+	}
 
 	return h("span", { ref: popover.rootRef, className: "bOPqQW_anchor", "data-composer-stat": "usage" }, h("button", {
 		type: "button",
@@ -532,6 +556,7 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 		titleValue: exactCount(total, t),
 		rows,
 		detailsAttr: { "data-session-stats-usage": true },
+		globalCost: true,
 		bucket,
 		approximate: false,
 		partialNote: partial && fromTime !== null ? tCost("detail.partial", { time: fromTime }) : undefined,

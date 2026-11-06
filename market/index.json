@@ -28,11 +28,11 @@
         "zh": "DeepSeek 峰谷费用"
       },
       "description": {
-        "en": "Appends DeepSeek peak/off-peak cost estimates to the native per-turn and session usage displays.",
-        "zh": "在原生每轮用量和整体用量文字后追加 DeepSeek 峰谷费用，点开可看高峰/空闲拆分。"
+        "en": "Appends DeepSeek peak/off-peak cost estimates to native usage displays and shows global today/month totals in the session dialog.",
+        "zh": "在原生用量显示后追加 DeepSeek 峰谷费用；整体用量弹窗还显示全局今天/本月费用。"
       },
       "icon": "https://raw.githubusercontent.com/Inspiring26/dsh-cost-display/main/assets/icon-180.png",
-      "author": "weeh",
+      "author": "Inspiring26",
       "homepage": "https://github.com/Inspiring26/dsh-cost-display",
       "repository": {
         "url": "https://github.com/Inspiring26/dsh-cost-display"
@@ -48,8 +48,8 @@
       },
       "versions": [
         {
-          "version": "0.1.0",
-          "publishTimestamp": 1793943827,
+          "version": "0.1.1",
+          "publishTimestamp": 1793954053,
           "source": {
             "type": "npm"
           },

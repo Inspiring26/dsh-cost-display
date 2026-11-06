@@ -23,8 +23,22 @@ const lines = [
 ];
 const zip = zipSync({ "session.v4.jsonl": strToU8(lines.join("\n")) });
 let fetchUrl = "";
+const globalSummary = {
+  today: { cost: 0.42, calls: 3 },
+  month: { cost: 3.5, calls: 9 },
+  asOf: 0,
+  sessions: 4,
+  failed: 0,
+  partial: false,
+};
 globalThis.fetch = async (url) => {
   fetchUrl = String(url);
+  if (String(url).includes("api/cost.summary")) {
+    return new Response(JSON.stringify(globalSummary), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
   return new Response(zip, { status: 200 });
 };
 
@@ -228,6 +242,24 @@ act(() => {
   tree.update(pillElement(tokenUsage));
 });
 assert.ok(JSON.stringify(tree.toJSON()).includes("bOPqQW_pill"), "pill should render after the projection arrives");
+// Opening the shipped-style pill must show the global today/month row.
+const trigger = tree.root.findByType("button");
+act(() => trigger.props.onClick());
+let opened = "";
+for (let attempt = 0; attempt < 50; attempt += 1) {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
+  opened = JSON.stringify(tree.toJSON());
+  if (opened.includes("¥0.42 / ¥3.50")) break;
+}
+assert.ok(!opened.includes("detail.cost"), "session card should omit the duplicate total cost row");
+assert.ok(opened.includes("detail.peak"), "session card should keep the peak cost row");
+assert.ok(opened.includes("detail.offPeak"), "session card should keep the off-peak cost row");
+assert.ok(opened.includes("detail.todayMonthGlobal"), "opened pill should show the combined global row");
+assert.ok(opened.includes("¥0.42 / ¥3.50"), "combined row should show today's and this month's costs");
+assert.ok(opened.indexOf("detail.offPeak") < opened.indexOf("detail.todayMonthGlobal"), "global row should be below the cost rows");
+assert.ok(opened.indexOf("detail.todayMonthGlobal") < opened.indexOf("detail.estimate"), "global row should be above the estimate note");
 act(() => tree.unmount());
 
 // 6. Partial coverage: the log has 2M tokens but the session projection reports

@@ -201,39 +201,31 @@ function addPriced(bucket, priced) {
 }
 
 /**
- * 把一份完整的会话 JSONL 折叠成费用总计与逐 Turn 费用。
+ * 把一批已解析的会话事件折叠成费用总计、按北京日与逐 Turn 的费用。
  *
  * 只统计 provider 真正上报了 usage 的 assistant/message 与
  * compaction/summary；不会从文本猜 token。fork 继承前缀（
  * `session/end-seed { inherited: true }` 之前）会被跳过，避免重复计费。
  *
- * @param jsonl - 会话导出文本（第一行 header，其余每行一个事件）。
+ * @param events - 会话事件数组（宿主端全局汇总直接传入，无需再序列化）。
  * @param options - { holidays?: string[] }
- * @returns { total, byTurn, calls, unpricedCalls, models, firstTime, lastTime }
+ * @returns { total, byDay, byTurn, calls, unpricedCalls, models, firstTime, lastTime }
  */
-function computeSessionCost(jsonl, options = {}) {
+function foldSessionCost(events, options = {}) {
+  const list = Array.isArray(events) ? events : [];
   const holidays = options.holidays ?? DEFAULT_HOLIDAYS;
-  const lines = typeof jsonl === "string" ? jsonl.split(/\r?\n/) : [];
-  const events = [];
-  for (const line of lines) {
-    const text = line.trim();
-    if (text === "") continue;
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed && typeof parsed === "object") events.push(parsed);
-    } catch {
-      // 导出的日志应当逐行合法；坏行宁可跳过，也不要让整个费用面板失效。
-    }
-  }
 
   // 跳过 fork 继承前缀：取最后一个 inherited 标记之后的事件。
-  let start = 0;
-  for (let index = 0; index < events.length; index += 1) {
-    const event = events[index];
-    if (event.type === "session/end-seed" && event.data?.inherited === true) start = index + 1;
+  // 宿主端还会传入日志头记录的前缀长度，标记缺失时用它兜底。
+  const inherited = Number.isInteger(options.inheritedEventCount) && options.inheritedEventCount > 0 ? options.inheritedEventCount : 0;
+  let start = Math.min(inherited, list.length);
+  for (let index = 0; index < list.length; index += 1) {
+    const event = list[index];
+    if (event.type === "session/end-seed" && event.data?.inherited === true) start = Math.max(start, index + 1);
   }
 
   const total = emptyBucket();
+  const byDay = Object.create(null);
   const byTurn = Object.create(null);
   const models = Object.create(null);
   const stepStarts = new Map();
@@ -248,7 +240,7 @@ function computeSessionCost(jsonl, options = {}) {
   // fork 子会话可能不在自己的日志里重复 route：继承前缀里的最后一个
   // request/context 或 request/header 仍是子会话实际使用的路由。
   for (let index = 0; index < start; index += 1) {
-    const event = events[index];
+    const event = list[index];
     const data = event.data ?? {};
     if (event.type === "request/header") {
       const config = data.header?.config;
@@ -273,6 +265,12 @@ function computeSessionCost(jsonl, options = {}) {
     const priced = priceUsage(usage, routeModel, at, holidays);
     addPriced(total, priced);
     addPriced(bucketFor(turn), priced);
+    // 按北京日历日聚合，供「今天费用 / 本月费用」直接读取。
+    if (Number.isFinite(at)) {
+      const date = beijingParts(at).date;
+      if (byDay[date] === undefined) byDay[date] = emptyBucket();
+      addPriced(byDay[date], priced);
+    }
     const modelKey = priced.priced ? priced.model : (priced.model || "(unknown)");
     if (models[modelKey] === undefined) {
       const label = priced.priced ? priced.label : priced.model || "(unknown)";
@@ -286,8 +284,8 @@ function computeSessionCost(jsonl, options = {}) {
     if (lastTime === null || at > lastTime) lastTime = at;
   };
 
-  for (let index = start; index < events.length; index += 1) {
-    const event = events[index];
+  for (let index = start; index < list.length; index += 1) {
+    const event = list[index];
     const data = event.data ?? {};
     switch (event.type) {
       case "request/header": {
@@ -350,6 +348,7 @@ function computeSessionCost(jsonl, options = {}) {
 
   return {
     total,
+    byDay,
     byTurn,
     calls: total.calls,
     unpricedCalls: total.unpricedCalls,
@@ -357,6 +356,28 @@ function computeSessionCost(jsonl, options = {}) {
     firstTime,
     lastTime,
   };
+}
+
+/**
+ * 把一份完整的会话 JSONL 折叠成费用总计、按北京日与逐 Turn 的费用。
+ * @param jsonl - 会话导出文本（第一行 header，其余每行一个事件）。
+ * @param options - { holidays?: string[] }
+ * @returns { total, byDay, byTurn, calls, unpricedCalls, models, firstTime, lastTime }
+ */
+function computeSessionCost(jsonl, options = {}) {
+  const lines = typeof jsonl === "string" ? jsonl.split(/\r?\n/) : [];
+  const events = [];
+  for (const line of lines) {
+    const text = line.trim();
+    if (text === "") continue;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === "object") events.push(parsed);
+    } catch {
+      // 导出的日志应当逐行合法；坏行宁可跳过，也不要让整个费用面板失效。
+    }
+  }
+  return foldSessionCost(events, options);
 }
 
 /** 从 usage 与单一 route 估算一个 Turn 的费用；用于日志尚未就绪时的兜底。 */
@@ -729,6 +750,60 @@ async function readRootLogFromExportResponse(response, options = {}) {
 				const timer = setTimeout(() => request(id, { maxAgeMs: 0 }), 1200);
 				return () => clearTimeout(timer);
 			}, [id, refreshKey]);
+			return state;
+		}
+
+		/* ------------------------------------------------------------------ *
+		 * Global today/month summary: one host-side fold over every session.
+		 * Only the aggregate route is cached here; the current-session log is
+		 * still folded locally for the per-turn and session detail rows.
+		 * ------------------------------------------------------------------ */
+
+		const GLOBAL_MAX_AGE_MS = 15000;
+		const GLOBAL_FETCH_TIMEOUT_MS = 25000;
+		const GLOBAL = { at: 0, value: undefined, pending: undefined };
+
+		function requestGlobalCost() {
+			const now = Date.now();
+			if (GLOBAL.value !== undefined && now - GLOBAL.at < GLOBAL_MAX_AGE_MS) return Promise.resolve(GLOBAL.value);
+			if (GLOBAL.pending !== undefined) return GLOBAL.pending;
+			GLOBAL.pending = (async () => {
+				const controller = new AbortController();
+				const timer = setTimeout(() => controller.abort(), GLOBAL_FETCH_TIMEOUT_MS);
+				try {
+					const url = new URL("api/cost.summary", document.baseURI);
+					const response = await fetch(url, {
+						credentials: "same-origin",
+						cache: "no-store",
+						signal: controller.signal
+					});
+					if (!response.ok) throw new Error("HTTP " + response.status);
+					const data = await response.json();
+					if (data === null || typeof data !== "object" || data.today === undefined || data.month === undefined) throw new Error("malformed cost summary");
+					GLOBAL.value = data;
+					GLOBAL.at = Date.now();
+					return data;
+				} finally {
+					clearTimeout(timer);
+					GLOBAL.pending = undefined;
+				}
+			})();
+			return GLOBAL.pending;
+		}
+
+		function useGlobalCost() {
+			const [state, setState] = React.useState({ status: "loading" });
+			React.useEffect(() => {
+				let alive = true;
+				requestGlobalCost().then((data) => {
+					if (alive) setState({ status: "ready", data });
+				}, (error) => {
+					if (alive) setState({ status: "error", error });
+				});
+				return () => {
+					alive = false;
+				};
+			}, []);
 			return state;
 		}
 
@@ -1126,9 +1201,11 @@ function row(key, label, value, valueClassName) {
 	return h(React.Fragment, { key }, h("dt", null, label), h("dd", valueClassName === undefined ? null : { className: valueClassName }, value));
 }
 
-function appendCostRows(rows, bucket, tCost, approximate, costLabel) {
-	const amount = displayAmount(bucket, approximate);
-	rows.push(row("cost", costLabel ?? tCost("detail.cost"), amount === null ? tCost("turn.unpriced") : amount));
+function appendCostRows(rows, bucket, tCost, approximate, costLabel, showTotal = true) {
+	if (showTotal) {
+		const amount = displayAmount(bucket, approximate);
+		rows.push(row("cost", costLabel ?? tCost("detail.cost"), amount === null ? tCost("turn.unpriced") : amount));
+	}
 	if (bucket.peakCalls > 0) {
 		rows.push(row("peak", tCost("detail.peak"), formatCny(bucket.peakCost) + " · " + tCost("detail.calls", { count: bucket.peakCalls })));
 	}
@@ -1140,7 +1217,25 @@ function appendCostRows(rows, bucket, tCost, approximate, costLabel) {
 	}
 }
 
-function UsageDialog({ popover, icon, title, titleValue, rows, detailsAttr, bucket, approximate, partialNote, unavailableNote, tCost }) {
+/**
+ * Global today/month figures from the host route. This block sits below the
+ * usage rows, between the rule and the estimate note.
+ */
+function GlobalCostSection({ tCost }) {
+	const state = useGlobalCost();
+	const amount = (value) => (state.data.partial ? "≥" : "") + formatCny(value);
+	let text;
+	if (state.status === "ready") {
+		text = amount(state.data.today.cost) + " / " + amount(state.data.month.cost);
+	} else if (state.status === "error") {
+		text = state.error?.message === "HTTP 404" ? tCost("detail.globalRestart") : tCost("detail.globalUnavailable");
+	} else {
+		text = tCost("detail.globalLoading");
+	}
+	return h("div", { className: "dsh-cost-global", "data-cost-global": true }, h("dl", { className: "bRhRbq_details" }, row("todayMonthGlobal", tCost("detail.todayMonthGlobal"), text)));
+}
+
+function UsageDialog({ popover, icon, title, titleValue, rows, detailsAttr, bucket, approximate, partialNote, unavailableNote, globalCost = false, tCost }) {
 	return h("div", {
 		ref: popover.panelRef,
 		className: "bRhRbq_panel",
@@ -1150,7 +1245,7 @@ function UsageDialog({ popover, icon, title, titleValue, rows, detailsAttr, buck
 	}, h("div", { className: "bRhRbq_title" }, h("span", { className: "bRhRbq_titleLabel" }, icon, title), titleValue !== undefined && h("span", { className: "bRhRbq_titleValue" }, titleValue)), h("div", {
 		className: "bRhRbq_titleRule",
 		"aria-hidden": true
-	}), h("dl", Object.assign({ className: "bRhRbq_details" }, detailsAttr), rows), bucket !== undefined && h("p", {
+	}), h("dl", Object.assign({ className: "bRhRbq_details" }, detailsAttr), rows), globalCost && h(GlobalCostSection, { tCost }), bucket !== undefined && h("p", {
 		className: "dsh-cost-note"
 	}, tCost("detail.estimate")), bucket !== undefined && h("p", {
 		className: "dsh-cost-note"
@@ -1390,7 +1485,11 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 	rows.push(row("cacheRead", t("message.turnUsage.cacheRead"), exactCount(usage.cacheReadTokens, t)));
 	if (usage.cacheWriteTokens !== 0) rows.push(row("cacheWrite", t("message.turnUsage.cacheWrite"), exactCount(usage.cacheWriteTokens, t)));
 	rows.push(row("output", t("message.turnUsage.output"), exactCount(usage.outputTokens, t)));
-	if (bucket !== undefined) appendCostRows(rows, bucket, tCost, false, fromTime === null ? undefined : tCost("detail.costFrom", { time: fromTime }));
+	if (bucket !== undefined) {
+		// The session card omits the total cost row: the pill label already shows
+		// it, and the detail keeps peak/off-peak plus the global row.
+		appendCostRows(rows, bucket, tCost, false, undefined, false);
+	}
 
 	return h("span", { ref: popover.rootRef, className: "bOPqQW_anchor", "data-composer-stat": "usage" }, h("button", {
 		type: "button",
@@ -1407,6 +1506,7 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 		titleValue: exactCount(total, t),
 		rows,
 		detailsAttr: { "data-session-stats-usage": true },
+		globalCost: true,
 		bucket,
 		approximate: false,
 		partialNote: partial && fromTime !== null ? tCost("detail.partial", { time: fromTime }) : undefined,
@@ -1433,6 +1533,10 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 			"detail.models": "模型路由",
 			"detail.peak": "高峰费用",
 			"detail.offPeak": "空闲费用",
+			"detail.todayMonthGlobal": "今天费用 / 本月费用（全局）",
+			"detail.globalLoading": "计算中…",
+			"detail.globalUnavailable": "暂不可用",
+			"detail.globalRestart": "需重启 DSH",
 			"detail.unpriced": "未定价调用",
 			"detail.calls": "{count} 次",
 			"detail.estimate": "按 DeepSeek 官方人民币峰谷价估算，不是账单。",
@@ -1452,6 +1556,10 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 			"detail.models": "Model routes",
 			"detail.peak": "Peak cost",
 			"detail.offPeak": "Off-peak cost",
+			"detail.todayMonthGlobal": "Today / this month (all sessions)",
+			"detail.globalLoading": "Calculating…",
+			"detail.globalUnavailable": "Unavailable",
+			"detail.globalRestart": "Restart DSH",
 			"detail.unpriced": "Unpriced calls",
 			"detail.calls": "{count} calls",
 			"detail.estimate": "Estimated from DeepSeek's official CNY peak/off-peak rates; not a bill.",
@@ -1461,7 +1569,9 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 
 		const CSS = [
 			".dsh-cost-note{border-top:.5px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-tertiary);margin:12px 0 0;padding-top:10px}",
-			".dsh-cost-note+.dsh-cost-note{border-top:0;margin-top:4px;padding-top:0}"
+			".dsh-cost-note+.dsh-cost-note{border-top:0;margin-top:4px;padding-top:0}",
+			".dsh-cost-global{border-top:.5px solid var(--dsw-alias-border-l2);margin-top:12px;padding-top:10px}",
+			".dsh-cost-global+.dsh-cost-note{border-top:0;margin-top:4px;padding-top:0}"
 		].join("");
 
 		/**
@@ -1539,6 +1649,7 @@ const UsagePill = React.memo(function UsagePill({ useProjection, usePerformanceU
 				snapshot,
 				resolveTurnBucket,
 				appendCostRows,
+				GlobalCostSection,
 				TurnTailNodeView,
 				UsagePill,
 				TurnUsagePanel,
